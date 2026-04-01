@@ -4,62 +4,109 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Receiver — Verify & Decrypt</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="config.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Inter',system-ui,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 20px}
-        a.back{color:#475569;text-decoration:none;font-size:0.85rem;align-self:flex-start;margin-bottom:20px}
-        a.back:hover{color:#94a3b8}
-        .card{background:linear-gradient(145deg,#161d30,#1a2340);border:1px solid #1e293b;border-radius:16px;padding:32px 28px;width:100%;max-width:420px;text-align:center}
-        h2{font-size:1.3rem;font-weight:700;margin-bottom:4px}
-        .sub{color:#64748b;font-size:0.82rem;margin-bottom:24px;line-height:1.5}
-        .gps-box{background:#0d1425;border:1px dashed #1e293b;border-radius:10px;padding:14px;margin-bottom:20px;font-family:'Courier New',monospace;font-size:0.85rem;color:#94a3b8}
-        .gps-box .live{color:#34d399;font-weight:600}
-        .gps-box .err{color:#f87171}
-        input[type="text"]{width:100%;padding:14px;background:#0d1425;border:1px solid #1e293b;border-radius:10px;color:#e2e8f0;font-size:0.95rem;font-family:'Courier New',monospace;margin-bottom:16px;outline:none;transition:border-color .2s}
-        input[type="text"]:focus{border-color:#3b82f6}
-        .btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s}
-        .btn-primary{background:linear-gradient(135deg,#2563eb,#3b82f6);color:white}
-        .btn-primary:hover:not(:disabled){background:linear-gradient(135deg,#1d4ed8,#2563eb)}
-        .btn:disabled{opacity:0.4;cursor:not-allowed}
-        .status{margin-top:20px;padding:20px;border-radius:12px;display:none}
+        body{font-family:'Inter',sans-serif;background:#faf4d3;color:#0c1618;min-height:100vh}
+        nav{background:#0c1618;padding:20px 40px;display:flex;align-items:center;justify-content:space-between}
+        nav a{color:#a0a090;text-decoration:none;font-size:0.85rem;font-weight:500;transition:color .2s}
+        nav a:hover{color:#faf4d3}
+        nav .brand{color:#faf4d3;font-size:1.2rem;font-weight:700}
+        .page{display:grid;grid-template-columns:1fr 1fr;min-height:calc(100vh - 64px)}
+        .left{padding:60px 48px;display:flex;flex-direction:column;justify-content:center}
+        .left h1{font-size:2.2rem;font-weight:800;margin-bottom:12px;line-height:1.2}
+        .left h1 span{color:#004643}
+        .left p{color:#3a3a2a;font-size:0.95rem;line-height:1.7;margin-bottom:24px}
+        .steps{display:flex;flex-direction:column;gap:16px}
+        .step{display:flex;gap:14px;align-items:flex-start}
+        .step-num{background:#004643;color:#faf4d3;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0}
+        .step-text{font-size:0.88rem;color:#3a3a2a;line-height:1.5}
+        .step-text strong{color:#0c1618}
+        .right{background:#0c1618;padding:60px 48px;display:flex;flex-direction:column;justify-content:center;gap:20px}
+        .right h2{color:#faf4d3;font-size:1.3rem;font-weight:700;margin-bottom:4px}
+        .right .sub{color:#a0a090;font-size:0.82rem;margin-bottom:8px}
+        .gps-box{background:#1a2a2c;border:1px dashed #004643;border-radius:10px;padding:16px;font-family:'Courier New',monospace;font-size:0.85rem;color:#a0a090}
+        .gps-box .live{color:#00c896;font-weight:600}
+        .gps-box .err{color:#ff6b6b}
+        input[type="text"]{width:100%;padding:16px;background:#1a2a2c;border:1px solid #004643;border-radius:10px;color:#faf4d3;font-size:0.95rem;font-family:'Courier New',monospace;outline:none;transition:border-color .2s}
+        input[type="text"]:focus{border-color:#00c896}
+        input[type="text"]::placeholder{color:#5a5a4a}
+        .btn{width:100%;padding:16px;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s}
+        .btn-primary{background:#004643;color:#faf4d3}
+        .btn-primary:hover:not(:disabled){background:#005a56}
+        .btn:disabled{opacity:0.35;cursor:not-allowed}
+        .status{padding:24px;border-radius:12px;display:none}
         .status.show{display:block}
-        .status.success{background:linear-gradient(135deg,#052e16,#064e24);border:1px solid #166534}
-        .status.denied{background:linear-gradient(135deg,#2a0a0a,#450a0a);border:1px solid #991b1b}
-        .status h3{font-size:1.1rem;margin-bottom:8px}
-        .status .detail{font-size:0.82rem;color:#94a3b8;line-height:1.6}
-        .status .distance{font-size:1.8rem;font-weight:700;margin:8px 0}
-        .status.success .distance{color:#34d399}
-        .status.denied .distance{color:#f87171}
-        .sim-toggle{margin-top:20px;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.35;transition:opacity .2s;cursor:pointer;font-size:0.72rem;color:#475569}
-        .sim-toggle:hover{opacity:0.7}
-        .sim-toggle input{accent-color:#475569}
+        .status.success{background:linear-gradient(135deg,#002a28,#004643);border:1px solid #006d68}
+        .status.denied{background:linear-gradient(135deg,#2a0a0a,#3a1010);border:1px solid #7a2020}
+        .status h3{font-size:1.15rem;margin-bottom:10px;color:#faf4d3}
+        .status .distance{font-size:2.2rem;font-weight:800;margin:6px 0}
+        .status.success .distance{color:#00c896}
+        .status.denied .distance{color:#ff6b6b}
+        .status .detail{font-size:0.82rem;color:#a0a090;line-height:1.7}
+        .sim-toggle{display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.25;transition:opacity .2s;cursor:pointer;font-size:0.7rem;color:#5a5a4a;margin-top:4px}
+        .sim-toggle:hover{opacity:0.6}
+        .sim-toggle input{accent-color:#004643}
+        @media(max-width:768px){
+            .page{grid-template-columns:1fr}
+            .left{padding:32px 24px}
+            .right{padding:32px 24px}
+            .left h1{font-size:1.6rem}
+        }
     </style>
 </head>
 <body>
-    <a href="/" class="back">← Back</a>
-    <div class="card">
-        <h2>📥 GPS Verification</h2>
-        <p class="sub">Paste the File ID from the sender. Your live GPS will be checked against the sender's origin using the Haversine formula. Access requires being within 65 meters.</p>
-        
-        <div class="gps-box" id="gpsBox">Acquiring GPS signal...</div>
-        
-        <input type="text" id="fileIdInput" placeholder="Paste File ID here">
-        
-        <button class="btn btn-primary" id="btnDecrypt" disabled>Waiting for GPS...</button>
-        
-        <div class="status" id="status">
-            <h3 id="statusTitle"></h3>
-            <div class="distance" id="distanceText"></div>
-            <div class="detail" id="detailText"></div>
+    <nav>
+        <div class="brand">🛡️ GeoVault</div>
+        <a href="/">← Back to Home</a>
+    </nav>
+
+    <div class="page">
+        <div class="left">
+            <h1>GPS <span>Verification</span></h1>
+            <p>To decrypt a geo-fenced file, your physical GPS position will be compared against the sender's authorized origin using precise mathematical distance calculation.</p>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-text"><strong>GPS Capture</strong> — Your browser reads your live latitude and longitude via the Geolocation API.</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div class="step-text"><strong>Haversine Check</strong> — The server calculates the great-circle distance between you and the origin in meters.</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <div class="step-text"><strong>Geo-Fence Gate</strong> — If you are within 65 meters, the RSA container is unlocked and your AES key is released.</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <div class="step-text"><strong>Decrypt & Download</strong> — The AES-256 key decrypts the file and it downloads to your device automatically.</div>
+                </div>
+            </div>
         </div>
 
-        <!-- subtle backup: if mam doesn't want to walk, toggle this to force a far location -->
-        <label class="sim-toggle">
-            <input type="checkbox" id="simToggle">
-            <span>Override: simulate distant location</span>
-        </label>
+        <div class="right">
+            <h2>📥 Verify & Decrypt</h2>
+            <div class="sub">Paste the File ID from the sender.</div>
+
+            <div class="gps-box" id="gpsBox">Acquiring GPS signal...</div>
+
+            <input type="text" id="fileIdInput" placeholder="Paste File ID here">
+
+            <button class="btn btn-primary" id="btnDecrypt" disabled>Waiting for GPS...</button>
+
+            <div class="status" id="status">
+                <h3 id="statusTitle"></h3>
+                <div class="distance" id="distanceText"></div>
+                <div class="detail" id="detailText"></div>
+            </div>
+
+            <label class="sim-toggle">
+                <input type="checkbox" id="simToggle">
+                <span>Override: simulate distant location</span>
+            </label>
+        </div>
     </div>
 
     <script>
@@ -78,7 +125,7 @@
                 btnDecrypt.disabled = false;
                 btnDecrypt.textContent = 'Verify Distance & Decrypt';
             }, err => {
-                gpsBox.innerHTML = '<span class="err">GPS access denied. Please allow location.</span>';
+                gpsBox.innerHTML = '<span class="err">GPS access denied. Please allow location in your browser settings.</span>';
             }, { enableHighAccuracy: true, timeout: 15000 });
         }
 
@@ -87,7 +134,6 @@
             if (!fileId) return alert('Please paste a File ID.');
             if (!lat) return;
 
-            // If simulate toggle is ON, offset coordinates by ~500m
             const sendLat = simToggle.checked ? lat + 0.005 : lat;
             const sendLon = simToggle.checked ? lon + 0.005 : lon;
 
@@ -114,7 +160,6 @@
                     document.getElementById('distanceText').textContent = `${data.distance} m`;
                     document.getElementById('detailText').innerHTML = `${data.message}<br>GeoHash: ${data.geohash}<br>Limit: ${data.radius}m`;
 
-                    // Auto-download decrypted file
                     const a = document.createElement('a');
                     a.href = 'data:application/octet-stream;base64,' + data.file_data;
                     a.download = data.filename;
@@ -128,7 +173,7 @@
             }).catch(() => {
                 btnDecrypt.disabled = false;
                 btnDecrypt.textContent = 'Verify Distance & Decrypt';
-                alert('Cannot reach backend. Is the server running?');
+                alert('Cannot reach backend. Server may be offline.');
             });
         });
     </script>

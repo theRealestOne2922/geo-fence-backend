@@ -4,43 +4,61 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Geo-Fenced Secure Transfer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Inter',system-ui,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
-        .logo{font-size:2.5rem;margin-bottom:8px}
-        h1{font-size:1.6rem;font-weight:700;margin-bottom:6px;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-        .sub{color:#64748b;font-size:0.9rem;max-width:340px;text-align:center;line-height:1.5;margin-bottom:40px}
-        .cards{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
-        .card{background:linear-gradient(145deg,#161d30,#1a2340);border:1px solid #1e293b;border-radius:16px;padding:32px 28px;width:260px;text-align:center;transition:transform .2s,border-color .3s;cursor:pointer;text-decoration:none;color:inherit}
-        .card:hover{transform:translateY(-4px);border-color:#3b82f6}
-        .card-icon{font-size:2.4rem;margin-bottom:14px}
-        .card h2{font-size:1.1rem;font-weight:600;margin-bottom:8px;color:#f1f5f9}
-        .card p{font-size:0.82rem;color:#64748b;line-height:1.5}
-        .badge{display:inline-block;background:#1e3a5f;color:#60a5fa;font-size:0.7rem;padding:4px 10px;border-radius:20px;margin-top:14px;font-weight:500}
-        .footer{margin-top:48px;font-size:0.72rem;color:#334155;text-align:center}
+        body{font-family:'Inter',sans-serif;background:#faf4d3;color:#0c1618;min-height:100vh}
+        nav{background:#0c1618;padding:20px 40px;display:flex;align-items:center;justify-content:space-between}
+        nav .brand{color:#faf4d3;font-size:1.2rem;font-weight:700;display:flex;align-items:center;gap:10px}
+        nav .tag{background:#004643;color:#faf4d3;font-size:0.65rem;padding:4px 10px;border-radius:20px;font-weight:500;letter-spacing:0.5px}
+        .hero{padding:60px 40px 40px;max-width:900px;margin:0 auto}
+        .hero h1{font-size:2.6rem;font-weight:800;color:#0c1618;line-height:1.2;margin-bottom:12px}
+        .hero h1 span{color:#004643}
+        .hero p{font-size:1.05rem;color:#3a3a2a;line-height:1.7;max-width:600px;margin-bottom:48px}
+        .cards{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:0 40px 60px;max-width:900px;margin:0 auto}
+        .card{background:#0c1618;border-radius:16px;padding:40px 32px;text-decoration:none;color:#faf4d3;transition:transform .2s,box-shadow .3s;display:flex;flex-direction:column;gap:16px}
+        .card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(12,22,24,0.2)}
+        .card-icon{font-size:2.2rem}
+        .card h2{font-size:1.3rem;font-weight:700}
+        .card p{font-size:0.88rem;color:#a0a090;line-height:1.6}
+        .card .badge{display:inline-block;background:#004643;color:#faf4d3;font-size:0.7rem;padding:6px 14px;border-radius:20px;font-weight:600;letter-spacing:0.5px;margin-top:auto;align-self:flex-start}
+        .footer-bar{position:fixed;bottom:0;left:0;right:0;background:#0c1618;padding:14px 40px;display:flex;align-items:center;justify-content:center;gap:20px;font-size:0.72rem;color:#5a5a4a}
+        .footer-bar span{color:#004643;font-weight:600}
+        @media(max-width:600px){
+            .hero{padding:40px 24px 24px}
+            .hero h1{font-size:1.8rem}
+            .cards{grid-template-columns:1fr;padding:0 24px 80px}
+        }
     </style>
 </head>
 <body>
-    <div class="logo">🛡️</div>
-    <h1>Geo-Fenced Secure Transfer</h1>
-    <p class="sub">AES-256 + RSA-2048 encrypted file transfer with real-time GPS geo-fencing. Decryption only works within 65 meters of the sender.</p>
-    
+    <nav>
+        <div class="brand">🛡️ GeoVault</div>
+        <div class="tag">AES-256 · RSA-2048 · HAVERSINE</div>
+    </nav>
+
+    <div class="hero">
+        <h1>Secure File Transfer<br>with <span>GPS Geo-Fencing</span></h1>
+        <p>Military-grade AES-256 encryption with RSA-2048 key protection. Files are physically locked to GPS coordinates — decryption is only possible within a 65-meter radius of the authorized origin.</p>
+    </div>
+
     <div class="cards">
         <a href="/sender" class="card">
             <div class="card-icon">📤</div>
             <h2>Sender</h2>
-            <p>Upload a file and lock it to your current GPS location using AES + RSA encryption.</p>
-            <span class="badge">ENCRYPT & LOCK</span>
+            <p>Upload any file and lock it to your current GPS location. The file gets AES-256 encrypted and the key is sealed with RSA-2048.</p>
+            <span class="badge">ENCRYPT & LOCK →</span>
         </a>
         <a href="/receiver" class="card">
             <div class="card-icon">📥</div>
             <h2>Receiver</h2>
-            <p>Enter File ID to verify your GPS distance and decrypt the protected file.</p>
-            <span class="badge">VERIFY & UNLOCK</span>
+            <p>Enter the File ID to attempt decryption. The Haversine formula calculates your exact distance from the origin in real-time.</p>
+            <span class="badge">VERIFY & UNLOCK →</span>
         </a>
     </div>
-    
-    <div class="footer">AES-256 GCM · RSA-2048 · Haversine Distance · GeoHash-7 · 65m Radius</div>
+
+    <div class="footer-bar">
+        <span>GeoHash-7</span> · Haversine Distance · <span>65m Radius</span> · AES-256 GCM · RSA-2048
+    </div>
 </body>
 </html>

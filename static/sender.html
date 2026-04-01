@@ -4,57 +4,104 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sender — Encrypt & Lock</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="config.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Inter',system-ui,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 20px}
-        a.back{color:#475569;text-decoration:none;font-size:0.85rem;align-self:flex-start;margin-bottom:20px}
-        a.back:hover{color:#94a3b8}
-        .card{background:linear-gradient(145deg,#161d30,#1a2340);border:1px solid #1e293b;border-radius:16px;padding:32px 28px;width:100%;max-width:420px;text-align:center}
-        h2{font-size:1.3rem;font-weight:700;margin-bottom:4px}
-        .sub{color:#64748b;font-size:0.82rem;margin-bottom:24px;line-height:1.5}
-        .gps-box{background:#0d1425;border:1px dashed #1e293b;border-radius:10px;padding:14px;margin-bottom:20px;font-family:'Courier New',monospace;font-size:0.85rem;color:#94a3b8}
-        .gps-box .live{color:#34d399;font-weight:600}
-        .gps-box .err{color:#f87171}
-        .file-input{width:100%;margin-bottom:16px}
+        body{font-family:'Inter',sans-serif;background:#faf4d3;color:#0c1618;min-height:100vh}
+        nav{background:#0c1618;padding:20px 40px;display:flex;align-items:center;justify-content:space-between}
+        nav a{color:#a0a090;text-decoration:none;font-size:0.85rem;font-weight:500;transition:color .2s}
+        nav a:hover{color:#faf4d3}
+        nav .brand{color:#faf4d3;font-size:1.2rem;font-weight:700}
+        .page{display:grid;grid-template-columns:1fr 1fr;min-height:calc(100vh - 64px)}
+        .left{padding:60px 48px;display:flex;flex-direction:column;justify-content:center}
+        .left h1{font-size:2.2rem;font-weight:800;margin-bottom:12px;line-height:1.2}
+        .left h1 span{color:#004643}
+        .left p{color:#3a3a2a;font-size:0.95rem;line-height:1.7;margin-bottom:24px}
+        .steps{display:flex;flex-direction:column;gap:16px}
+        .step{display:flex;gap:14px;align-items:flex-start}
+        .step-num{background:#004643;color:#faf4d3;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0}
+        .step-text{font-size:0.88rem;color:#3a3a2a;line-height:1.5}
+        .step-text strong{color:#0c1618}
+        .right{background:#0c1618;padding:60px 48px;display:flex;flex-direction:column;justify-content:center;gap:20px}
+        .right h2{color:#faf4d3;font-size:1.3rem;font-weight:700;margin-bottom:4px}
+        .right .sub{color:#a0a090;font-size:0.82rem;margin-bottom:8px}
+        .gps-box{background:#1a2a2c;border:1px dashed #004643;border-radius:10px;padding:16px;font-family:'Courier New',monospace;font-size:0.85rem;color:#a0a090}
+        .gps-box .live{color:#00c896;font-weight:600}
+        .gps-box .err{color:#ff6b6b}
+        .file-input{width:100%}
         .file-input input[type="file"]{display:none}
-        .file-input label{display:block;background:#111827;border:2px dashed #1e293b;border-radius:10px;padding:20px;cursor:pointer;color:#64748b;font-size:0.85rem;transition:border-color .2s}
-        .file-input label:hover{border-color:#3b82f6}
-        .file-input .selected{color:#60a5fa;font-weight:500}
-        .btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s}
-        .btn-primary{background:linear-gradient(135deg,#2563eb,#3b82f6);color:white}
-        .btn-primary:hover:not(:disabled){background:linear-gradient(135deg,#1d4ed8,#2563eb)}
-        .btn:disabled{opacity:0.4;cursor:not-allowed}
-        .result{margin-top:20px;background:#0d1425;border-radius:10px;padding:16px;display:none;text-align:left}
+        .file-input label{display:block;background:#1a2a2c;border:2px dashed #004643;border-radius:10px;padding:24px;cursor:pointer;color:#a0a090;font-size:0.88rem;transition:border-color .2s;text-align:center}
+        .file-input label:hover{border-color:#00c896}
+        .file-input .selected{color:#00c896;font-weight:500}
+        .btn{width:100%;padding:16px;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s}
+        .btn-primary{background:#004643;color:#faf4d3}
+        .btn-primary:hover:not(:disabled){background:#005a56}
+        .btn:disabled{opacity:0.35;cursor:not-allowed}
+        .result{background:#1a2a2c;border-radius:10px;padding:20px;display:none;text-align:left}
         .result.show{display:block}
-        .result .label{font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
-        .result .file-id{font-family:'Courier New',monospace;font-size:0.95rem;color:#34d399;word-break:break-all;background:#071018;padding:12px;border-radius:8px;margin:8px 0;user-select:all}
-        .result .copy-btn{background:#1e293b;color:#94a3b8;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-top:6px}
-        .result .copy-btn:hover{background:#334155;color:#e2e8f0}
-        .info{font-size:0.75rem;color:#475569;margin-top:6px}
+        .result .label{font-size:0.7rem;color:#a0a090;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+        .result .file-id{font-family:'Courier New',monospace;font-size:0.95rem;color:#00c896;word-break:break-all;background:#0c1618;padding:14px;border-radius:8px;margin:8px 0;user-select:all}
+        .result .copy-btn{background:#004643;color:#faf4d3;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;margin-top:4px}
+        .result .copy-btn:hover{background:#005a56}
+        .info{font-size:0.72rem;color:#5a5a4a;margin-top:8px}
+        @media(max-width:768px){
+            .page{grid-template-columns:1fr}
+            .left{padding:32px 24px}
+            .right{padding:32px 24px}
+            .left h1{font-size:1.6rem}
+        }
     </style>
 </head>
 <body>
-    <a href="/" class="back">← Back</a>
-    <div class="card">
-        <h2>📤 Encrypt & Lock to GPS</h2>
-        <p class="sub">Your file will be AES-256 encrypted. The AES key is RSA-protected and locked to your exact GPS coordinates. Only someone within 65m can decrypt.</p>
-        
-        <div class="gps-box" id="gpsBox">Acquiring GPS signal...</div>
-        
-        <div class="file-input">
-            <label for="fileInput" id="fileLabel">Tap to select a file</label>
-            <input type="file" id="fileInput">
+    <nav>
+        <div class="brand">🛡️ GeoVault</div>
+        <a href="/">← Back to Home</a>
+    </nav>
+
+    <div class="page">
+        <div class="left">
+            <h1>Encrypt & <span>Lock to GPS</span></h1>
+            <p>Your file will be encrypted using military-grade AES-256 and locked to your exact geographic position. Only someone within 65 meters of this spot can ever unlock it.</p>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-text"><strong>GPS Lock</strong> — Your browser captures your live latitude and longitude using the Geolocation API.</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div class="step-text"><strong>AES-256 Encrypt</strong> — A random 256-bit key encrypts your file using GCM authenticated encryption.</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <div class="step-text"><strong>RSA-2048 Seal</strong> — The AES key is locked inside an RSA-2048 asymmetric container.</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <div class="step-text"><strong>GeoHash Bind</strong> — Your GPS coordinates are stored as the authorized origin for the 65m geo-fence.</div>
+                </div>
+            </div>
         </div>
-        
-        <button class="btn btn-primary" id="btnEncrypt" disabled>Waiting for GPS...</button>
-        
-        <div class="result" id="result">
-            <div class="label">Share this File ID with the Receiver</div>
-            <div class="file-id" id="fileIdText"></div>
-            <button class="copy-btn" id="btnCopy">Copy to Clipboard</button>
-            <div class="info" id="infoText"></div>
+
+        <div class="right">
+            <h2>📤 Upload & Encrypt</h2>
+            <div class="sub">Your GPS will be captured automatically.</div>
+
+            <div class="gps-box" id="gpsBox">Acquiring GPS signal...</div>
+
+            <div class="file-input">
+                <label for="fileInput" id="fileLabel">Tap to select a file</label>
+                <input type="file" id="fileInput">
+            </div>
+
+            <button class="btn btn-primary" id="btnEncrypt" disabled>Waiting for GPS...</button>
+
+            <div class="result" id="result">
+                <div class="label">Share this File ID with the Receiver</div>
+                <div class="file-id" id="fileIdText"></div>
+                <button class="copy-btn" id="btnCopy">Copy to Clipboard</button>
+                <div class="info" id="infoText"></div>
+            </div>
         </div>
     </div>
 
@@ -81,7 +128,7 @@
                 btnEncrypt.disabled = false;
                 btnEncrypt.textContent = 'Encrypt & Lock File';
             }, err => {
-                gpsBox.innerHTML = '<span class="err">GPS access denied. Please allow location.</span>';
+                gpsBox.innerHTML = '<span class="err">GPS access denied. Please allow location in your browser settings.</span>';
             }, { enableHighAccuracy: true, timeout: 15000 });
         }
 
