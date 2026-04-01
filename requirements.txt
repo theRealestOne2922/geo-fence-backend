@@ -1,0 +1,6 @@
+Flask==3.0.0
+flask-cors==4.0.0
+pycryptodome==3.19.0
+rsa==4.9
+geohash2==1.1
+gunicorn==21.2.0
