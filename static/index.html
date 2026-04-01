@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geo-Fenced Secure Transfer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',system-ui,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+        .logo{font-size:2.5rem;margin-bottom:8px}
+        h1{font-size:1.6rem;font-weight:700;margin-bottom:6px;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .sub{color:#64748b;font-size:0.9rem;max-width:340px;text-align:center;line-height:1.5;margin-bottom:40px}
+        .cards{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+        .card{background:linear-gradient(145deg,#161d30,#1a2340);border:1px solid #1e293b;border-radius:16px;padding:32px 28px;width:260px;text-align:center;transition:transform .2s,border-color .3s;cursor:pointer;text-decoration:none;color:inherit}
+        .card:hover{transform:translateY(-4px);border-color:#3b82f6}
+        .card-icon{font-size:2.4rem;margin-bottom:14px}
+        .card h2{font-size:1.1rem;font-weight:600;margin-bottom:8px;color:#f1f5f9}
+        .card p{font-size:0.82rem;color:#64748b;line-height:1.5}
+        .badge{display:inline-block;background:#1e3a5f;color:#60a5fa;font-size:0.7rem;padding:4px 10px;border-radius:20px;margin-top:14px;font-weight:500}
+        .footer{margin-top:48px;font-size:0.72rem;color:#334155;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="logo">🛡️</div>
+    <h1>Geo-Fenced Secure Transfer</h1>
+    <p class="sub">AES-256 + RSA-2048 encrypted file transfer with real-time GPS geo-fencing. Decryption only works within 65 meters of the sender.</p>
+    
+    <div class="cards">
+        <a href="sender.html" class="card">
+            <div class="card-icon">📤</div>
+            <h2>Sender</h2>
+            <p>Upload a file and lock it to your current GPS location using AES + RSA encryption.</p>
+            <span class="badge">ENCRYPT & LOCK</span>
+        </a>
+        <a href="receiver.html" class="card">
+            <div class="card-icon">📥</div>
+            <h2>Receiver</h2>
+            <p>Enter File ID to verify your GPS distance and decrypt the protected file.</p>
+            <span class="badge">VERIFY & UNLOCK</span>
+        </a>
+    </div>
+    
+    <div class="footer">AES-256 GCM · RSA-2048 · Haversine Distance · GeoHash-7 · 65m Radius</div>
+</body>
+</html>

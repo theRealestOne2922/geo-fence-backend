@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receiver — Verify & Decrypt</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="config.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',system-ui,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 20px}
+        a.back{color:#475569;text-decoration:none;font-size:0.85rem;align-self:flex-start;margin-bottom:20px}
+        a.back:hover{color:#94a3b8}
+        .card{background:linear-gradient(145deg,#161d30,#1a2340);border:1px solid #1e293b;border-radius:16px;padding:32px 28px;width:100%;max-width:420px;text-align:center}
+        h2{font-size:1.3rem;font-weight:700;margin-bottom:4px}
+        .sub{color:#64748b;font-size:0.82rem;margin-bottom:24px;line-height:1.5}
+        .gps-box{background:#0d1425;border:1px dashed #1e293b;border-radius:10px;padding:14px;margin-bottom:20px;font-family:'Courier New',monospace;font-size:0.85rem;color:#94a3b8}
+        .gps-box .live{color:#34d399;font-weight:600}
+        .gps-box .err{color:#f87171}
+        input[type="text"]{width:100%;padding:14px;background:#0d1425;border:1px solid #1e293b;border-radius:10px;color:#e2e8f0;font-size:0.95rem;font-family:'Courier New',monospace;margin-bottom:16px;outline:none;transition:border-color .2s}
+        input[type="text"]:focus{border-color:#3b82f6}
+        .btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-primary{background:linear-gradient(135deg,#2563eb,#3b82f6);color:white}
+        .btn-primary:hover:not(:disabled){background:linear-gradient(135deg,#1d4ed8,#2563eb)}
+        .btn:disabled{opacity:0.4;cursor:not-allowed}
+        .status{margin-top:20px;padding:20px;border-radius:12px;display:none}
+        .status.show{display:block}
+        .status.success{background:linear-gradient(135deg,#052e16,#064e24);border:1px solid #166534}
+        .status.denied{background:linear-gradient(135deg,#2a0a0a,#450a0a);border:1px solid #991b1b}
+        .status h3{font-size:1.1rem;margin-bottom:8px}
+        .status .detail{font-size:0.82rem;color:#94a3b8;line-height:1.6}
+        .status .distance{font-size:1.8rem;font-weight:700;margin:8px 0}
+        .status.success .distance{color:#34d399}
+        .status.denied .distance{color:#f87171}
+        .sim-toggle{margin-top:20px;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.35;transition:opacity .2s;cursor:pointer;font-size:0.72rem;color:#475569}
+        .sim-toggle:hover{opacity:0.7}
+        .sim-toggle input{accent-color:#475569}
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back">← Back</a>
+    <div class="card">
+        <h2>📥 GPS Verification</h2>
+        <p class="sub">Paste the File ID from the sender. Your live GPS will be checked against the sender's origin using the Haversine formula. Access requires being within 65 meters.</p>
+        
+        <div class="gps-box" id="gpsBox">Acquiring GPS signal...</div>
+        
+        <input type="text" id="fileIdInput" placeholder="Paste File ID here">
+        
+        <button class="btn btn-primary" id="btnDecrypt" disabled>Waiting for GPS...</button>
+        
+        <div class="status" id="status">
+            <h3 id="statusTitle"></h3>
+            <div class="distance" id="distanceText"></div>
+            <div class="detail" id="detailText"></div>
+        </div>
+
+        <!-- subtle backup: if mam doesn't want to walk, toggle this to force a far location -->
+        <label class="sim-toggle">
+            <input type="checkbox" id="simToggle">
+            <span>Override: simulate distant location</span>
+        </label>
+    </div>
+
+    <script>
+        let lat = null, lon = null;
+        const gpsBox = document.getElementById('gpsBox');
+        const btnDecrypt = document.getElementById('btnDecrypt');
+        const simToggle = document.getElementById('simToggle');
+
+        if (!navigator.geolocation) {
+            gpsBox.innerHTML = '<span class="err">GPS not supported.</span>';
+        } else {
+            navigator.geolocation.getCurrentPosition(pos => {
+                lat = pos.coords.latitude;
+                lon = pos.coords.longitude;
+                gpsBox.innerHTML = `<span class="live">📍 GPS Locked</span><br>${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+                btnDecrypt.disabled = false;
+                btnDecrypt.textContent = 'Verify Distance & Decrypt';
+            }, err => {
+                gpsBox.innerHTML = '<span class="err">GPS access denied. Please allow location.</span>';
+            }, { enableHighAccuracy: true, timeout: 15000 });
+        }
+
+        btnDecrypt.addEventListener('click', () => {
+            const fileId = document.getElementById('fileIdInput').value.trim();
+            if (!fileId) return alert('Please paste a File ID.');
+            if (!lat) return;
+
+            // If simulate toggle is ON, offset coordinates by ~500m
+            const sendLat = simToggle.checked ? lat + 0.005 : lat;
+            const sendLon = simToggle.checked ? lon + 0.005 : lon;
+
+            btnDecrypt.disabled = true;
+            btnDecrypt.textContent = 'Calculating distance...';
+
+            const statusDiv = document.getElementById('status');
+            statusDiv.classList.remove('show', 'success', 'denied');
+
+            fetch(`${API_URL}/decrypt`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ file_id: fileId, lat: sendLat, lon: sendLon })
+            })
+            .then(r => r.json())
+            .then(data => {
+                btnDecrypt.disabled = false;
+                btnDecrypt.textContent = 'Verify Distance & Decrypt';
+                statusDiv.classList.add('show');
+
+                if (data.success) {
+                    statusDiv.classList.add('success');
+                    document.getElementById('statusTitle').textContent = '✅ Location Verified';
+                    document.getElementById('distanceText').textContent = `${data.distance} m`;
+                    document.getElementById('detailText').innerHTML = `${data.message}<br>GeoHash: ${data.geohash}<br>Limit: ${data.radius}m`;
+
+                    // Auto-download decrypted file
+                    const a = document.createElement('a');
+                    a.href = 'data:application/octet-stream;base64,' + data.file_data;
+                    a.download = data.filename;
+                    a.click();
+                } else {
+                    statusDiv.classList.add('denied');
+                    document.getElementById('statusTitle').textContent = '🚫 Access Denied';
+                    document.getElementById('distanceText').textContent = `${data.distance} m`;
+                    document.getElementById('detailText').innerHTML = `${data.message}<br>GeoHash: ${data.geohash || 'N/A'}`;
+                }
+            }).catch(() => {
+                btnDecrypt.disabled = false;
+                btnDecrypt.textContent = 'Verify Distance & Decrypt';
+                alert('Cannot reach backend. Is the server running?');
+            });
+        });
+    </script>
+</body>
+</html>

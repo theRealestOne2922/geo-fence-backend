@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sender — Encrypt & Lock</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="config.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',system-ui,sans-serif;background:#0a0f1e;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 20px}
+        a.back{color:#475569;text-decoration:none;font-size:0.85rem;align-self:flex-start;margin-bottom:20px}
+        a.back:hover{color:#94a3b8}
+        .card{background:linear-gradient(145deg,#161d30,#1a2340);border:1px solid #1e293b;border-radius:16px;padding:32px 28px;width:100%;max-width:420px;text-align:center}
+        h2{font-size:1.3rem;font-weight:700;margin-bottom:4px}
+        .sub{color:#64748b;font-size:0.82rem;margin-bottom:24px;line-height:1.5}
+        .gps-box{background:#0d1425;border:1px dashed #1e293b;border-radius:10px;padding:14px;margin-bottom:20px;font-family:'Courier New',monospace;font-size:0.85rem;color:#94a3b8}
+        .gps-box .live{color:#34d399;font-weight:600}
+        .gps-box .err{color:#f87171}
+        .file-input{width:100%;margin-bottom:16px}
+        .file-input input[type="file"]{display:none}
+        .file-input label{display:block;background:#111827;border:2px dashed #1e293b;border-radius:10px;padding:20px;cursor:pointer;color:#64748b;font-size:0.85rem;transition:border-color .2s}
+        .file-input label:hover{border-color:#3b82f6}
+        .file-input .selected{color:#60a5fa;font-weight:500}
+        .btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .2s}
+        .btn-primary{background:linear-gradient(135deg,#2563eb,#3b82f6);color:white}
+        .btn-primary:hover:not(:disabled){background:linear-gradient(135deg,#1d4ed8,#2563eb)}
+        .btn:disabled{opacity:0.4;cursor:not-allowed}
+        .result{margin-top:20px;background:#0d1425;border-radius:10px;padding:16px;display:none;text-align:left}
+        .result.show{display:block}
+        .result .label{font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+        .result .file-id{font-family:'Courier New',monospace;font-size:0.95rem;color:#34d399;word-break:break-all;background:#071018;padding:12px;border-radius:8px;margin:8px 0;user-select:all}
+        .result .copy-btn{background:#1e293b;color:#94a3b8;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;margin-top:6px}
+        .result .copy-btn:hover{background:#334155;color:#e2e8f0}
+        .info{font-size:0.75rem;color:#475569;margin-top:6px}
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back">← Back</a>
+    <div class="card">
+        <h2>📤 Encrypt & Lock to GPS</h2>
+        <p class="sub">Your file will be AES-256 encrypted. The AES key is RSA-protected and locked to your exact GPS coordinates. Only someone within 65m can decrypt.</p>
+        
+        <div class="gps-box" id="gpsBox">Acquiring GPS signal...</div>
+        
+        <div class="file-input">
+            <label for="fileInput" id="fileLabel">Tap to select a file</label>
+            <input type="file" id="fileInput">
+        </div>
+        
+        <button class="btn btn-primary" id="btnEncrypt" disabled>Waiting for GPS...</button>
+        
+        <div class="result" id="result">
+            <div class="label">Share this File ID with the Receiver</div>
+            <div class="file-id" id="fileIdText"></div>
+            <button class="copy-btn" id="btnCopy">Copy to Clipboard</button>
+            <div class="info" id="infoText"></div>
+        </div>
+    </div>
+
+    <script>
+        let lat = null, lon = null;
+        const gpsBox = document.getElementById('gpsBox');
+        const btnEncrypt = document.getElementById('btnEncrypt');
+        const fileInput = document.getElementById('fileInput');
+        const fileLabel = document.getElementById('fileLabel');
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                fileLabel.innerHTML = `<span class="selected">📎 ${fileInput.files[0].name}</span>`;
+            }
+        });
+
+        if (!navigator.geolocation) {
+            gpsBox.innerHTML = '<span class="err">GPS not supported by this browser.</span>';
+        } else {
+            navigator.geolocation.getCurrentPosition(pos => {
+                lat = pos.coords.latitude;
+                lon = pos.coords.longitude;
+                gpsBox.innerHTML = `<span class="live">📍 GPS Locked</span><br>${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+                btnEncrypt.disabled = false;
+                btnEncrypt.textContent = 'Encrypt & Lock File';
+            }, err => {
+                gpsBox.innerHTML = '<span class="err">GPS access denied. Please allow location.</span>';
+            }, { enableHighAccuracy: true, timeout: 15000 });
+        }
+
+        btnEncrypt.addEventListener('click', () => {
+            const file = fileInput.files[0];
+            if (!file) return alert('Please select a file first.');
+            if (!lat) return;
+
+            btnEncrypt.disabled = true;
+            btnEncrypt.textContent = 'Encrypting...';
+
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('lat', lat);
+            fd.append('lon', lon);
+
+            fetch(`${API_URL}/encrypt`, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                btnEncrypt.textContent = 'Encrypt & Lock File';
+                btnEncrypt.disabled = false;
+                if (data.success) {
+                    const res = document.getElementById('result');
+                    res.classList.add('show');
+                    document.getElementById('fileIdText').textContent = data.file_id;
+                    document.getElementById('infoText').textContent = `GeoHash: ${data.geohash} | Origin: ${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}`;
+                }
+            }).catch(() => {
+                alert('Cannot reach backend. Is the server running?');
+                btnEncrypt.textContent = 'Encrypt & Lock File';
+                btnEncrypt.disabled = false;
+            });
+        });
+
+        document.getElementById('btnCopy').addEventListener('click', () => {
+            const id = document.getElementById('fileIdText').textContent;
+            navigator.clipboard.writeText(id).then(() => {
+                document.getElementById('btnCopy').textContent = '✓ Copied!';
+                setTimeout(() => document.getElementById('btnCopy').textContent = 'Copy to Clipboard', 2000);
+            });
+        });
+    </script>
+</body>
+</html>
