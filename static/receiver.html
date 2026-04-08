@@ -70,23 +70,23 @@
     <div class="page">
         <div class="left">
             <h1>GPS <span>Verification</span></h1>
-            <p>To decrypt a geo-fenced file, your physical GPS position will be compared against the sender's authorized origin using precise mathematical distance calculation.</p>
+            <p>To decrypt a geo-fenced file, your physical GPS position, Device ID, Time limit, and OTP will be strictly validated.</p>
             <div class="steps">
                 <div class="step">
                     <div class="step-num">1</div>
-                    <div class="step-text"><strong>GPS Capture</strong> — Your browser reads your live latitude and longitude via the Geolocation API.</div>
+                    <div class="step-text"><strong>Gateway Checks</strong> — Server validates your Device Signature, Time Expiry limit, and Haversine Geo-fence (65m limit).</div>
                 </div>
                 <div class="step">
                     <div class="step-num">2</div>
-                    <div class="step-text"><strong>Haversine Check</strong> — The server calculates the great-circle distance between you and the origin in meters.</div>
+                    <div class="step-text"><strong>Request Access</strong> — If all constraints pass, an access OTP is generated and dispatched to the authorized recipient.</div>
                 </div>
                 <div class="step">
                     <div class="step-num">3</div>
-                    <div class="step-text"><strong>Geo-Fence Gate</strong> — If you are within 65 meters, the RSA container is unlocked and your AES key is released.</div>
+                    <div class="step-text"><strong>Verify & Decrypt</strong> — Entering the correct OTP triggers the RSA container to unlock, releasing the AES-256 key to decrypt the file.</div>
                 </div>
                 <div class="step">
                     <div class="step-num">4</div>
-                    <div class="step-text"><strong>Decrypt & Download</strong> — The AES-256 key decrypts the file and it downloads to your device automatically.</div>
+                    <div class="step-text"><strong>Burn Notice</strong> — If the file was sent with a "One-Time" limit, it gets permanently locked (burned) immediately after this decryption.</div>
                 </div>
             </div>
         </div>
@@ -101,7 +101,12 @@
 
             <div class="file-info" id="fileInfo"></div>
 
-            <button class="btn btn-primary" id="btnDecrypt" disabled>Waiting for GPS...</button>
+            <button class="btn btn-primary" id="btnRequestOTP" disabled>Waiting for GPS...</button>
+
+            <div id="otpSection" style="display:none;">
+                <input type="text" id="otpInput" placeholder="Enter 6-digit OTP" style="margin-bottom:12px; text-align:center; font-size:1.2rem; letter-spacing:4px;" maxlength="6">
+                <button class="btn btn-primary" id="btnVerifyOTP">Verify OTP & Decrypt</button>
+            </div>
 
             <div class="status" id="status">
                 <h3 id="statusTitle"></h3>
@@ -119,7 +124,9 @@
     <script>
         let lat = null, lon = null;
         const gpsBox = document.getElementById('gpsBox');
-        const btnDecrypt = document.getElementById('btnDecrypt');
+        const btnRequestOTP = document.getElementById('btnRequestOTP');
+        const otpSection = document.getElementById('otpSection');
+        const btnVerifyOTP = document.getElementById('btnVerifyOTP');
         const simToggle = document.getElementById('simToggle');
 
         if (!navigator.geolocation) {
@@ -129,8 +136,8 @@
                 lat = pos.coords.latitude;
                 lon = pos.coords.longitude;
                 gpsBox.innerHTML = `<span class="live">📍 GPS Locked</span><br>${lat.toFixed(6)}, ${lon.toFixed(6)}`;
-                btnDecrypt.disabled = false;
-                btnDecrypt.textContent = 'Verify Distance & Decrypt';
+                btnRequestOTP.disabled = false;
+                btnRequestOTP.textContent = 'Verify Distance & Request Access';
             }, err => {
                 gpsBox.innerHTML = '<span class="err">GPS access denied. Please allow location in your browser settings.</span>';
             }, { enableHighAccuracy: true, timeout: 15000 });
@@ -171,16 +178,60 @@
             }
         });
 
-        btnDecrypt.addEventListener('click', () => {
+        btnRequestOTP.addEventListener('click', () => {
             const fileId = document.getElementById('fileIdInput').value.trim();
             if (!fileId) return alert('Please paste a File ID.');
             if (!lat) return;
 
             const sendLat = simToggle.checked ? lat + 0.005 : lat;
             const sendLon = simToggle.checked ? lon + 0.005 : lon;
+            const deviceId = navigator.userAgent;
 
-            btnDecrypt.disabled = true;
-            btnDecrypt.textContent = 'Calculating distance...';
+            btnRequestOTP.disabled = true;
+            btnRequestOTP.textContent = 'Verifying access constraints...';
+
+            const statusDiv = document.getElementById('status');
+            statusDiv.classList.remove('show', 'success', 'denied');
+
+            fetch(`${API_URL}/request-otp`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ file_id: fileId, lat: sendLat, lon: sendLon, device_id: deviceId })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    btnRequestOTP.style.display = 'none';
+                    otpSection.style.display = 'block';
+                    document.getElementById('otpInput').focus();
+                    alert('OTP generated! Check the backend console terminal to see the simulated SMS/Email OTP code.');
+                } else {
+                    btnRequestOTP.disabled = false;
+                    btnRequestOTP.textContent = 'Verify Distance & Request Access';
+                    statusDiv.classList.add('show', 'denied');
+                    document.getElementById('statusTitle').textContent = '🚫 Access Denied';
+                    document.getElementById('distanceText').textContent = data.distance >= 0 ? `${data.distance} m` : '—';
+                    const burnedHtml = data.blocked_reason === 'one_time' ? '<br><span style="color:#ff6b6b;font-weight:bold;">🔥 File was burned after first read.</span>' : '';
+                    document.getElementById('detailText').innerHTML = `${data.message}<br>GeoHash: ${data.geohash || 'N/A'}${data.expired ? '<br><span style="color:#ff6b6b">File has expired.</span>' : ''}${burnedHtml}`;
+                }
+            }).catch(() => {
+                btnRequestOTP.disabled = false;
+                btnRequestOTP.textContent = 'Verify Distance & Request Access';
+                alert('Cannot reach backend.');
+            });
+        });
+
+        btnVerifyOTP.addEventListener('click', () => {
+            const fileId = document.getElementById('fileIdInput').value.trim();
+            const otpCode = document.getElementById('otpInput').value.trim();
+            if (!fileId || !otpCode) return alert('Please enter the OTP.');
+
+            const sendLat = simToggle.checked ? lat + 0.005 : lat;
+            const sendLon = simToggle.checked ? lon + 0.005 : lon;
+            const deviceId = navigator.userAgent;
+
+            btnVerifyOTP.disabled = true;
+            btnVerifyOTP.textContent = 'Decrypting...';
 
             const statusDiv = document.getElementById('status');
             statusDiv.classList.remove('show', 'success', 'denied');
@@ -188,19 +239,19 @@
             fetch(`${API_URL}/decrypt`, {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ file_id: fileId, lat: sendLat, lon: sendLon })
+                body: JSON.stringify({ file_id: fileId, lat: sendLat, lon: sendLon, device_id: deviceId, otp: otpCode })
             })
             .then(r => r.json())
             .then(data => {
-                btnDecrypt.disabled = false;
-                btnDecrypt.textContent = 'Verify Distance & Decrypt';
+                btnVerifyOTP.disabled = false;
+                btnVerifyOTP.textContent = 'Verify OTP & Decrypt';
                 statusDiv.classList.add('show');
 
                 if (data.success) {
                     statusDiv.classList.add('success');
-                    document.getElementById('statusTitle').textContent = '✅ Location Verified';
+                    document.getElementById('statusTitle').textContent = '✅ Verification Complete';
                     document.getElementById('distanceText').textContent = `${data.distance} m`;
-                    document.getElementById('detailText').innerHTML = `${data.message}<br>GeoHash: ${data.geohash}<br>Limit: ${data.radius}m`;
+                    document.getElementById('detailText').innerHTML = `OTP matched! ${data.message}<br>GeoHash: ${data.geohash}<br>Limit: ${data.radius}m`;
 
                     const a = document.createElement('a');
                     a.href = 'data:application/octet-stream;base64,' + data.file_data;
@@ -208,15 +259,15 @@
                     a.click();
                 } else {
                     statusDiv.classList.add('denied');
-                    document.getElementById('statusTitle').textContent = '🚫 Access Denied';
+                    document.getElementById('statusTitle').textContent = '🚫 Decryption Failed';
                     document.getElementById('distanceText').textContent = data.distance >= 0 ? `${data.distance} m` : '—';
                     const burnedHtml = data.blocked_reason === 'one_time' ? '<br><span style="color:#ff6b6b;font-weight:bold;">🔥 File was burned after first read.</span>' : '';
                     document.getElementById('detailText').innerHTML = `${data.message}<br>GeoHash: ${data.geohash || 'N/A'}${data.expired ? '<br><span style="color:#ff6b6b">File has expired.</span>' : ''}${burnedHtml}`;
                 }
             }).catch(() => {
-                btnDecrypt.disabled = false;
-                btnDecrypt.textContent = 'Verify Distance & Decrypt';
-                alert('Cannot reach backend. Server may be offline.');
+                btnVerifyOTP.disabled = false;
+                btnVerifyOTP.textContent = 'Verify OTP & Decrypt';
+                alert('Cannot reach backend.');
             });
         });
     </script>

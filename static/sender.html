@@ -63,12 +63,12 @@
 
     <div class="page">
         <div class="left">
-            <h1>Encrypt & <span>Lock to GPS</span></h1>
-            <p>Your file will be encrypted using military-grade AES-256 and locked to your exact geographic position. Only someone within 65 meters of this spot can ever unlock it.</p>
+            <h1>Encrypt & <span>Lock to Device</span></h1>
+            <p>Your file will be encrypted using military-grade AES-256 and locked to your <b>Device Profile</b> and <b>exact geographic position</b>. Only this exact device within a 65m radius can unlock it.</p>
             <div class="steps">
                 <div class="step">
                     <div class="step-num">1</div>
-                    <div class="step-text"><strong>GPS Lock</strong> — Your browser captures your live latitude and longitude using the Geolocation API.</div>
+                    <div class="step-text"><strong>Device & GPS Lock</strong> — Your browser captures your `userAgent` and live GPS coordinates.</div>
                 </div>
                 <div class="step">
                     <div class="step-num">2</div>
@@ -76,11 +76,11 @@
                 </div>
                 <div class="step">
                     <div class="step-num">3</div>
-                    <div class="step-text"><strong>RSA-2048 Seal</strong> — The AES key is locked inside an RSA-2048 asymmetric container.</div>
+                    <div class="step-text"><strong>Security Bind</strong> — The AES key is tied to your exact location, time window, and device identifier.</div>
                 </div>
                 <div class="step">
                     <div class="step-num">4</div>
-                    <div class="step-text"><strong>GeoHash Bind</strong> — Your GPS coordinates are stored as the authorized origin for the 65m geo-fence.</div>
+                    <div class="step-text"><strong>Burn Limit</strong> — Optionally enable "One-Time" usage to auto-destroy the file after its first download.</div>
                 </div>
             </div>
         </div>
@@ -162,6 +162,7 @@
             fd.append('lon', lon);
             fd.append('expiry', document.getElementById('expirySelect').value);
             fd.append('one_time', isOneTime);
+            fd.append('device_id', navigator.userAgent);
 
             fetch(`${API_URL}/encrypt`, { method: 'POST', body: fd })
             .then(r => r.json())

@@ -4,6 +4,7 @@ import os
 import uuid
 import json
 import time
+import random
 from datetime import datetime, timezone
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
@@ -112,6 +113,7 @@ def encrypt():
     lon_str = request.form.get('lon')
     expiry_str = request.form.get('expiry', str(FILE_EXPIRY_SECONDS))
     one_time = request.form.get('one_time', 'false') == 'true'
+    device_id = request.form.get('device_id')
 
     if not file or not lat_str or not lon_str:
         return jsonify({"error": "Missing file or GPS coordinates"}), 400
@@ -140,7 +142,8 @@ def encrypt():
         "expiry_seconds": expiry_secs,
         "file_size": len(file_data),
         "one_time": one_time,
-        "decrypted": False
+        "decrypted": False,
+        "device_id": device_id
     }
     with open(os.path.join(DATA_DIR, f"{file_id}_meta.json"), 'w') as f:
         json.dump(meta, f)
@@ -185,15 +188,67 @@ def file_info():
         "already_decrypted": meta.get('decrypted', False)
     })
 
+# ─── API: REQUEST OTP ───────────────────────────────────────────────
+@app.route('/request-otp', methods=['POST'])
+def request_otp():
+    data = request.json
+    file_id = data.get('file_id')
+    lat, lon = data.get('lat'), data.get('lon')
+    device_id = data.get('device_id')
+
+    if not file_id or lat is None or lon is None:
+        return jsonify({"error": "Missing file_id or GPS coordinates"}), 400
+
+    meta_path = os.path.join(DATA_DIR, f"{file_id}_meta.json")
+    if not os.path.exists(meta_path):
+        return jsonify({"error": "Invalid File ID. Not found."}), 404
+
+    with open(meta_path, 'r') as f:
+        meta = json.load(f)
+
+    # 1. Check Device Binding
+    if meta.get('device_id') and meta['device_id'] != device_id:
+        log_access(file_id, lat, lon, -1, "DENIED", "Device mismatch (OTP Request)")
+        return jsonify({"success": False, "message": "Device mismatch. This file is bound to the sender's device.", "blocked_reason": "device", "distance": -1})
+
+    # 2. Check One-time lock
+    if meta.get('one_time') and meta.get('decrypted'):
+        return jsonify({"success": False, "message": "This file was set to ONE-TIME decryption and has already been accessed.", "blocked_reason": "one_time", "distance": -1})
+
+    # 3. Check Expiry
+    elapsed = time.time() - meta['created_at']
+    if elapsed > meta['expiry_seconds']:
+        return jsonify({"success": False, "message": f"File has expired. Valid for {meta['expiry_seconds'] // 60}m.", "blocked_reason": "expired", "distance": -1, "expired": True})
+
+    # 4. Check Geo-fence
+    distance = haversine(meta['lat'], meta['lon'], lat, lon)
+    if distance > GEO_FENCE_RADIUS_METERS:
+        recv_ghash = geohash2.encode(lat, lon, precision=7)
+        return jsonify({"success": False, "message": f"Outside geo-fence. You are {distance:.1f}m away.", "blocked_reason": "geo_fence", "distance": round(distance, 1), "radius": GEO_FENCE_RADIUS_METERS, "geohash": recv_ghash})
+
+    # Generate OTP
+    otp = str(random.randint(100000, 999999))
+    meta['otp'] = otp
+    meta['otp_expires'] = time.time() + 300  # valid for 5 mins
+    with open(meta_path, 'w') as f:
+        json.dump(meta, f)
+
+    # SIMULATE SENDING OTP (Email/SMS)
+    print(f"\n{'='*50}\n[SIMULATED SMS] OTP for file {file_id[:8]} is: >> {otp} <<\n{'='*50}\n")
+    
+    return jsonify({"success": True, "message": "OTP generated and sent to console."})
+
 # ─── API: DECRYPT ───────────────────────────────────────────────────
 @app.route('/decrypt', methods=['POST'])
 def decrypt():
     data = request.json
     file_id = data.get('file_id')
     lat, lon = data.get('lat'), data.get('lon')
+    device_id = data.get('device_id')
+    otp = str(data.get('otp', '')).strip()
 
-    if not file_id or lat is None or lon is None:
-        return jsonify({"error": "Missing file_id or GPS coordinates"}), 400
+    if not file_id or lat is None or lon is None or not device_id or not otp:
+        return jsonify({"error": "Missing file_id, GPS coordinates, device_id, or OTP"}), 400
 
     meta_path = os.path.join(DATA_DIR, f"{file_id}_meta.json")
     if not os.path.exists(meta_path):
@@ -203,7 +258,25 @@ def decrypt():
     with open(meta_path, 'r') as f:
         meta = json.load(f)
 
-    # ── CHECK 1: One-time lock ──
+    # ── CHECK 1: Device Binding ──
+    if meta.get('device_id') and meta['device_id'] != device_id:
+        log_access(file_id, lat, lon, -1, "DENIED", "Device mismatch (Decrypt)")
+        return jsonify({
+            "success": False, "distance": -1,
+            "message": "Device mismatch. This file is strictly bound to the sender's device.",
+            "blocked_reason": "device"
+        })
+
+    # ── CHECK 2: OTP Verification ──
+    if not meta.get('otp') or str(meta.get('otp')) != otp or time.time() > meta.get('otp_expires', 0):
+        log_access(file_id, lat, lon, -1, "DENIED", "Invalid or Expired OTP")
+        return jsonify({
+            "success": False, "distance": -1,
+            "message": "Invalid or expired OTP. Please request a new one.",
+            "blocked_reason": "otp"
+        })
+
+    # ── CHECK 3: One-time lock ──
     if meta.get('one_time') and meta.get('decrypted'):
         log_access(file_id, lat, lon, -1, "DENIED", "One-time limit reached")
         return jsonify({
