@@ -37,7 +37,7 @@ for fpath in [LOGS_FILE, ALERTS_FILE]:
 print(f"[Setup] Geo-fence: {GEO_FENCE_RADIUS_METERS}m | Expiry: {FILE_EXPIRY_SECONDS}s. Ready.")
 
 # ─── SMS CONFIG ─────────────────────────────────────────────────────
-FAST2SMS_API_KEY = os.environ.get('FAST2SMS_API_KEY', '')
+FAST2SMS_API_KEY = os.environ.get('FAST2SMS_API_KEY', 'Zru5EvN9Oa7BxPpkVDj2RY8iQwUC4SAzfeLMHlbWd0sgKmtF1GpYP0yWfZTAj1hxuKiUVXv8NrHokRnS')
 OTP_PHONE = os.environ.get('OTP_PHONE', '7305037087')
 
 def send_sms_otp(otp_code, phone=None):
