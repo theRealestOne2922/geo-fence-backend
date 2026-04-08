@@ -41,24 +41,35 @@ FAST2SMS_API_KEY = os.environ.get('FAST2SMS_API_KEY', 'Zru5EvN9Oa7BxPpkVDj2RY8iQ
 OTP_PHONE = os.environ.get('OTP_PHONE', '7305037087')
 
 def send_sms_otp(otp_code, phone=None):
-    """Send OTP via Fast2SMS. Falls back to console if API key missing."""
+    """Send OTP via Fast2SMS Quick route."""
     target = phone or OTP_PHONE
     if not FAST2SMS_API_KEY:
         print(f"[SMS] No API key set. OTP is: {otp_code}")
         return False
     try:
+        message = f"GeoVault OTP: {otp_code}. Valid for 5 minutes. Do not share with anyone."
         resp = http_requests.post(
             'https://www.fast2sms.com/dev/bulkV2',
-            headers={'authorization': FAST2SMS_API_KEY},
-            data={'route': 'otp', 'variables_values': otp_code, 'numbers': target},
+            headers={
+                'authorization': FAST2SMS_API_KEY,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            data={
+                'route': 'q',
+                'message': message,
+                'language': 'english',
+                'flash': 0,
+                'numbers': target
+            },
             timeout=10
         )
         result = resp.json()
+        print(f"[SMS] Fast2SMS response: {result}")
         if result.get('return'):
             print(f"[SMS] OTP {otp_code} sent to +91{target}")
             return True
         else:
-            print(f"[SMS] Failed: {result.get('message', 'Unknown error')}")
+            print(f"[SMS] Failed: {result.get('message', result)}")
             return False
     except Exception as e:
         print(f"[SMS] Error: {e}")
