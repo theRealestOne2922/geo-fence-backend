@@ -158,9 +158,12 @@
                             const secs = info.remaining_seconds % 60;
                             const expLabel = info.expired
                                 ? '<span class="expired">⛔ EXPIRED</span>'
-                                : `<span class="active">⏱ ${mins}m ${secs}s remaining</span>`;
+                                : (info.one_time && info.already_decrypted)
+                                    ? '<span class="expired">⛔ BURNED (ALREADY READ)</span>'
+                                    : `<span class="active">⏱ ${mins}m ${secs}s remaining</span>`;
                             const sizeKB = (info.file_size / 1024).toFixed(1);
-                            fileInfoDiv.innerHTML = `File: <span class="fname">${info.filename}</span> (${sizeKB} KB)<br>GeoHash: ${info.geohash}<br>Status: ${expLabel}`;
+                            const otLabel = info.one_time ? '<br><span style="color:#ff6b6b;font-weight:bold;">🔥 BURN AFTER READING</span>' : '';
+                            fileInfoDiv.innerHTML = `File: <span class="fname">${info.filename}</span> (${sizeKB} KB)<br>GeoHash: ${info.geohash}<br>Status: ${expLabel}${otLabel}`;
                             fileInfoDiv.classList.add('show');
                         }
                     }).catch(() => {});
@@ -206,8 +209,9 @@
                 } else {
                     statusDiv.classList.add('denied');
                     document.getElementById('statusTitle').textContent = '🚫 Access Denied';
-                    document.getElementById('distanceText').textContent = `${data.distance} m`;
-                    document.getElementById('detailText').innerHTML = `${data.message}<br>GeoHash: ${data.geohash || 'N/A'}${data.expired ? '<br><span style="color:#ff6b6b">File has expired.</span>' : ''}`;
+                    document.getElementById('distanceText').textContent = data.distance >= 0 ? `${data.distance} m` : '—';
+                    const burnedHtml = data.blocked_reason === 'one_time' ? '<br><span style="color:#ff6b6b;font-weight:bold;">🔥 File was burned after first read.</span>' : '';
+                    document.getElementById('detailText').innerHTML = `${data.message}<br>GeoHash: ${data.geohash || 'N/A'}${data.expired ? '<br><span style="color:#ff6b6b">File has expired.</span>' : ''}${burnedHtml}`;
                 }
             }).catch(() => {
                 btnDecrypt.disabled = false;

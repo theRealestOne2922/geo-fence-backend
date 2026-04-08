@@ -24,12 +24,13 @@ print("[Setup] Generating RSA-2048 keys...")
 public_key, private_key = rsa.newkeys(2048)
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 LOGS_FILE = os.path.join(DATA_DIR, 'access_log.json')
+ALERTS_FILE = os.path.join(DATA_DIR, 'alerts.json')
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Initialize access log
-if not os.path.exists(LOGS_FILE):
-    with open(LOGS_FILE, 'w') as f:
-        json.dump([], f)
+for fpath in [LOGS_FILE, ALERTS_FILE]:
+    if not os.path.exists(fpath):
+        with open(fpath, 'w') as f:
+            json.dump([], f)
 
 print(f"[Setup] Geo-fence: {GEO_FENCE_RADIUS_METERS}m | Expiry: {FILE_EXPIRY_SECONDS}s. Ready.")
 
@@ -43,7 +44,6 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 def log_access(file_id, lat, lon, distance, result, reason):
-    """Append an access attempt to the JSON log file."""
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "file_id": file_id,
@@ -62,6 +62,30 @@ def log_access(file_id, lat, lon, distance, result, reason):
     with open(LOGS_FILE, 'w') as f:
         json.dump(logs, f, indent=2)
     print(f"[Log] {result} | {reason} | dist={entry['distance_m']}m | {file_id[:8]}...")
+
+    # ── Alert on unauthorized attempts ──
+    if result == "DENIED":
+        raise_alert(file_id, lat, lon, distance, reason)
+
+def raise_alert(file_id, lat, lon, distance, reason):
+    alert = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "file_id": file_id,
+        "lat": round(lat, 6),
+        "lon": round(lon, 6),
+        "distance_m": round(distance, 1) if distance >= 0 else None,
+        "reason": reason,
+        "severity": "CRITICAL" if reason == "Outside geo-fence" else "WARNING"
+    }
+    try:
+        with open(ALERTS_FILE, 'r') as f:
+            alerts = json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        alerts = []
+    alerts.append(alert)
+    with open(ALERTS_FILE, 'w') as f:
+        json.dump(alerts, f, indent=2)
+    print(f"[ALERT] {alert['severity']} | {reason} | {file_id[:8]}...")
 
 # ─── FRONTEND ROUTES ────────────────────────────────────────────────
 @app.route('/')
@@ -87,6 +111,7 @@ def encrypt():
     lat_str = request.form.get('lat')
     lon_str = request.form.get('lon')
     expiry_str = request.form.get('expiry', str(FILE_EXPIRY_SECONDS))
+    one_time = request.form.get('one_time', 'false') == 'true'
 
     if not file or not lat_str or not lon_str:
         return jsonify({"error": "Missing file or GPS coordinates"}), 400
@@ -113,20 +138,23 @@ def encrypt():
         "filename": file.filename,
         "created_at": created_at,
         "expiry_seconds": expiry_secs,
-        "file_size": len(file_data)
+        "file_size": len(file_data),
+        "one_time": one_time,
+        "decrypted": False
     }
     with open(os.path.join(DATA_DIR, f"{file_id}_meta.json"), 'w') as f:
         json.dump(meta, f)
 
     expires_at = datetime.fromtimestamp(created_at + expiry_secs, tz=timezone.utc).isoformat()
-    print(f"[Encrypt] Locked @ ({lat:.6f}, {lon:.6f}) ID={file_id} expires={expires_at}")
+    mode = "ONE-TIME" if one_time else "MULTI-USE"
+    print(f"[Encrypt] {mode} | Locked @ ({lat:.6f}, {lon:.6f}) ID={file_id} expires={expires_at}")
     return jsonify({
         "success": True, "file_id": file_id, "geohash": ghash,
         "lat": lat, "lon": lon, "expires_at": expires_at,
-        "expiry_minutes": expiry_secs // 60
+        "expiry_minutes": expiry_secs // 60, "one_time": one_time
     })
 
-# ─── API: FILE INFO (check status before decrypt) ──────────────────
+# ─── API: FILE INFO ────────────────────────────────────────────────
 @app.route('/file-info', methods=['POST'])
 def file_info():
     data = request.json
@@ -152,7 +180,9 @@ def file_info():
         "geohash": meta['geohash'],
         "expired": expired,
         "remaining_seconds": int(remaining),
-        "expiry_minutes": meta['expiry_seconds'] // 60
+        "expiry_minutes": meta['expiry_seconds'] // 60,
+        "one_time": meta.get('one_time', False),
+        "already_decrypted": meta.get('decrypted', False)
     })
 
 # ─── API: DECRYPT ───────────────────────────────────────────────────
@@ -173,17 +203,26 @@ def decrypt():
     with open(meta_path, 'r') as f:
         meta = json.load(f)
 
-    # ── Expiry Check ──
+    # ── CHECK 1: One-time lock ──
+    if meta.get('one_time') and meta.get('decrypted'):
+        log_access(file_id, lat, lon, -1, "DENIED", "One-time limit reached")
+        return jsonify({
+            "success": False, "distance": -1,
+            "message": "This file was set to ONE-TIME decryption and has already been accessed.",
+            "blocked_reason": "one_time"
+        })
+
+    # ── CHECK 2: Expiry ──
     elapsed = time.time() - meta['created_at']
     if elapsed > meta['expiry_seconds']:
         log_access(file_id, lat, lon, -1, "DENIED", "File expired")
         return jsonify({
-            "success": False,
+            "success": False, "distance": -1, "expired": True,
             "message": f"File has expired. It was valid for {meta['expiry_seconds'] // 60} minutes.",
-            "distance": -1, "expired": True
+            "blocked_reason": "expired"
         })
 
-    # ── Distance Check ──
+    # ── CHECK 3: Geo-fence ──
     distance = haversine(meta['lat'], meta['lon'], lat, lon)
     recv_ghash = geohash2.encode(lat, lon, precision=7)
 
@@ -192,12 +231,11 @@ def decrypt():
         return jsonify({
             "success": False,
             "message": f"Outside geo-fence. You are {distance:.1f}m away (limit: {GEO_FENCE_RADIUS_METERS}m).",
-            "distance": round(distance, 1),
-            "radius": GEO_FENCE_RADIUS_METERS,
-            "geohash": recv_ghash
+            "distance": round(distance, 1), "radius": GEO_FENCE_RADIUS_METERS,
+            "geohash": recv_ghash, "blocked_reason": "geo_fence"
         })
 
-    # ── Crypto Unlock ──
+    # ── ALL CHECKS PASSED: Decrypt ──
     try:
         with open(os.path.join(DATA_DIR, f"{file_id}_key.enc"), 'rb') as f:
             enc_key = f.read()
@@ -211,18 +249,23 @@ def decrypt():
         log_access(file_id, lat, lon, distance, "DENIED", "Crypto failure")
         return jsonify({"success": False, "message": "Cryptographic failure", "distance": round(distance, 1)})
 
+    # ── Mark as decrypted (for one-time files) ──
+    if meta.get('one_time'):
+        meta['decrypted'] = True
+        with open(meta_path, 'w') as f:
+            json.dump(meta, f)
+
     remaining = max(0, meta['expiry_seconds'] - elapsed)
     log_access(file_id, lat, lon, distance, "GRANTED", "Decryption successful")
 
     return jsonify({
         "success": True,
         "message": f"Within authorized zone ({distance:.1f}m). Decryption granted.",
-        "distance": round(distance, 1),
-        "radius": GEO_FENCE_RADIUS_METERS,
-        "geohash": recv_ghash,
-        "filename": meta['filename'],
+        "distance": round(distance, 1), "radius": GEO_FENCE_RADIUS_METERS,
+        "geohash": recv_ghash, "filename": meta['filename'],
         "file_data": base64.b64encode(plain).decode(),
-        "remaining_seconds": int(remaining)
+        "remaining_seconds": int(remaining),
+        "one_time": meta.get('one_time', False)
     })
 
 # ─── API: ACCESS LOGS ──────────────────────────────────────────────
@@ -233,8 +276,17 @@ def get_logs():
             logs = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         logs = []
-    # Return most recent first
     return jsonify({"logs": list(reversed(logs))})
+
+# ─── API: ALERTS ────────────────────────────────────────────────────
+@app.route('/api/alerts', methods=['GET'])
+def get_alerts():
+    try:
+        with open(ALERTS_FILE, 'r') as f:
+            alerts = json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        alerts = []
+    return jsonify({"alerts": list(reversed(alerts)), "count": len(alerts)})
 
 @app.route('/health')
 def health():

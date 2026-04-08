@@ -103,6 +103,11 @@
                 <option value="86400">Expires in 24 hours</option>
             </select>
 
+            <label class="one-time-toggle" style="display:flex;align-items:center;gap:8px;margin-bottom:16px;color:#a0a090;font-size:0.85rem;cursor:pointer;">
+                <input type="checkbox" id="oneTimeCheck" style="accent-color:#004643;width:16px;height:16px;">
+                <span>Destroy after first successful decryption (One-Time)</span>
+            </label>
+
             <button class="btn btn-primary" id="btnEncrypt" disabled>Waiting for GPS...</button>
 
             <div class="result" id="result">
@@ -149,11 +154,14 @@
             btnEncrypt.disabled = true;
             btnEncrypt.textContent = 'Encrypting...';
 
+            const isOneTime = document.getElementById('oneTimeCheck').checked;
+
             const fd = new FormData();
             fd.append('file', file);
             fd.append('lat', lat);
             fd.append('lon', lon);
             fd.append('expiry', document.getElementById('expirySelect').value);
+            fd.append('one_time', isOneTime);
 
             fetch(`${API_URL}/encrypt`, { method: 'POST', body: fd })
             .then(r => r.json())
@@ -164,7 +172,8 @@
                     const res = document.getElementById('result');
                     res.classList.add('show');
                     document.getElementById('fileIdText').textContent = data.file_id;
-                    document.getElementById('infoText').textContent = `GeoHash: ${data.geohash} | Origin: ${data.lat.toFixed(5)}, ${data.lon.toFixed(5)} | Expires in ${data.expiry_minutes} min`;
+                    const oneTimeStr = data.one_time ? ' | One-Time Use' : '';
+                    document.getElementById('infoText').textContent = `GeoHash: ${data.geohash} | Origin: ${data.lat.toFixed(5)}, ${data.lon.toFixed(5)} | Expires in ${data.expiry_minutes} min${oneTimeStr}`;
                 }
             }).catch(() => {
                 alert('Cannot reach backend. Is the server running?');

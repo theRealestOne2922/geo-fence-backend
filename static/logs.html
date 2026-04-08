@@ -44,8 +44,25 @@
     <div class="container">
         <h1>Access <span>Logs</span></h1>
         <p class="subtitle">Every decryption attempt is logged with timestamp, GPS coordinates, distance, and result.</p>
-        <button class="refresh-btn" id="btnRefresh">🔄 Refresh Logs</button>
+        <button class="refresh-btn" id="btnRefresh">🔄 Refresh Logs & Alerts</button>
 
+        <h2 style="font-size:1.4rem; font-weight:700; margin-bottom:12px; color:#c0392b;">🚨 Security Alerts</h2>
+        <table style="margin-bottom:40px; border:2px solid #c0392b;">
+            <thead style="background:#3a1010; color:#ff6b6b;">
+                <tr>
+                    <th>Severity</th>
+                    <th>Time</th>
+                    <th>File ID</th>
+                    <th>GPS</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody id="alertsBody">
+                <tr><td colspan="5" class="empty">Loading alerts...</td></tr>
+            </tbody>
+        </table>
+
+        <h2 style="font-size:1.4rem; font-weight:700; margin-bottom:12px;">📊 Access History</h2>
         <table>
             <thead>
                 <tr>
@@ -65,6 +82,7 @@
 
     <script>
         function loadLogs() {
+            // Load standard logs
             fetch(`${API_URL}/api/logs`)
             .then(r => r.json())
             .then(data => {
@@ -90,6 +108,32 @@
                 }).join('');
             }).catch(() => {
                 document.getElementById('logBody').innerHTML = '<tr><td colspan="6" class="empty">Failed to load logs.</td></tr>';
+            });
+
+            // Load Security Alerts
+            fetch(`${API_URL}/api/alerts`)
+            .then(r => r.json())
+            .then(data => {
+                const body = document.getElementById('alertsBody');
+                if (!data.alerts || data.alerts.length === 0) {
+                    body.innerHTML = '<tr><td colspan="5" class="empty" style="color:#00c896">No security alerts detected. System secure.</td></tr>';
+                    return;
+                }
+                body.innerHTML = data.alerts.map(alert => {
+                    const t = new Date(alert.timestamp);
+                    const time = t.toLocaleString();
+                    const sevColor = alert.severity === 'CRITICAL' ? '#ff6b6b' : '#f39c12';
+                    const shortId = alert.file_id.substring(0, 8) + '...';
+                    return `<tr>
+                        <td style="color:${sevColor}; font-weight:800">${alert.severity}</td>
+                        <td>${time}</td>
+                        <td class="file-id" title="${alert.file_id}">${shortId}</td>
+                        <td>${alert.lat}, ${alert.lon}</td>
+                        <td style="color:#faf4d3">${alert.reason}</td>
+                    </tr>`;
+                }).join('');
+            }).catch(() => {
+                document.getElementById('alertsBody').innerHTML = '<tr><td colspan="5" class="empty">Failed to load alerts.</td></tr>';
             });
         }
 
