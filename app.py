@@ -12,6 +12,7 @@ import rsa
 import math
 import geohash2
 import base64
+import requests as http_requests
 
 # ─── APP SETUP ──────────────────────────────────────────────────────
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
@@ -34,6 +35,34 @@ for fpath in [LOGS_FILE, ALERTS_FILE]:
             json.dump([], f)
 
 print(f"[Setup] Geo-fence: {GEO_FENCE_RADIUS_METERS}m | Expiry: {FILE_EXPIRY_SECONDS}s. Ready.")
+
+# ─── SMS CONFIG ─────────────────────────────────────────────────────
+FAST2SMS_API_KEY = os.environ.get('FAST2SMS_API_KEY', '')
+OTP_PHONE = os.environ.get('OTP_PHONE', '7305037087')
+
+def send_sms_otp(otp_code, phone=None):
+    """Send OTP via Fast2SMS. Falls back to console if API key missing."""
+    target = phone or OTP_PHONE
+    if not FAST2SMS_API_KEY:
+        print(f"[SMS] No API key set. OTP is: {otp_code}")
+        return False
+    try:
+        resp = http_requests.post(
+            'https://www.fast2sms.com/dev/bulkV2',
+            headers={'authorization': FAST2SMS_API_KEY},
+            data={'route': 'otp', 'variables_values': otp_code, 'numbers': target},
+            timeout=10
+        )
+        result = resp.json()
+        if result.get('return'):
+            print(f"[SMS] OTP {otp_code} sent to +91{target}")
+            return True
+        else:
+            print(f"[SMS] Failed: {result.get('message', 'Unknown error')}")
+            return False
+    except Exception as e:
+        print(f"[SMS] Error: {e}")
+        return False
 
 # ─── HELPERS ────────────────────────────────────────────────────────
 def haversine(lat1, lon1, lat2, lon2):
@@ -233,10 +262,12 @@ def request_otp():
     with open(meta_path, 'w') as f:
         json.dump(meta, f)
 
-    # SIMULATE SENDING OTP (Email/SMS)
-    print(f"\n{'='*50}\n[SIMULATED SMS] OTP for file {file_id[:8]} is: >> {otp} <<\n{'='*50}\n")
+    # Send OTP via SMS
+    sms_sent = send_sms_otp(otp)
+    print(f"\n{'='*50}\n[OTP] Code for file {file_id[:8]}: >> {otp} << | SMS sent: {sms_sent}\n{'='*50}\n")
     
-    return jsonify({"success": True, "message": "OTP generated and sent to console."})
+    msg = "OTP sent to your registered mobile number via SMS." if sms_sent else "OTP generated. Check server logs (SMS not configured)."
+    return jsonify({"success": True, "message": msg, "sms_sent": sms_sent})
 
 # ─── API: DECRYPT ───────────────────────────────────────────────────
 @app.route('/decrypt', methods=['POST'])
