@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Logs — GeoVault</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="config.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',sans-serif;background:#faf4d3;color:#0c1618;min-height:100vh}
+        nav{background:#0c1618;padding:20px 40px;display:flex;align-items:center;justify-content:space-between}
+        nav a{color:#a0a090;text-decoration:none;font-size:0.85rem;font-weight:500;transition:color .2s}
+        nav a:hover{color:#faf4d3}
+        nav .brand{color:#faf4d3;font-size:1.2rem;font-weight:700}
+        .container{padding:40px;max-width:1000px;margin:0 auto}
+        h1{font-size:1.8rem;font-weight:800;margin-bottom:8px}
+        h1 span{color:#004643}
+        .subtitle{color:#3a3a2a;font-size:0.95rem;margin-bottom:32px}
+        .refresh-btn{background:#004643;color:#faf4d3;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;margin-bottom:24px}
+        .refresh-btn:hover{background:#005a56}
+        table{width:100%;border-collapse:collapse;font-size:0.82rem}
+        thead{background:#0c1618;color:#faf4d3}
+        th{padding:14px 16px;text-align:left;font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px}
+        td{padding:12px 16px;border-bottom:1px solid #e8e0b8}
+        tr:hover{background:#f0e8c0}
+        .granted{color:#004643;font-weight:700}
+        .denied{color:#c0392b;font-weight:700}
+        .file-id{font-family:'Courier New',monospace;font-size:0.78rem;color:#3a3a2a}
+        .empty{text-align:center;padding:60px 20px;color:#999;font-size:0.95rem}
+        @media(max-width:768px){
+            .container{padding:24px 16px}
+            table{font-size:0.72rem}
+            th,td{padding:8px 10px}
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="brand">🛡️ GeoVault</div>
+        <a href="/">← Back to Home</a>
+    </nav>
+
+    <div class="container">
+        <h1>Access <span>Logs</span></h1>
+        <p class="subtitle">Every decryption attempt is logged with timestamp, GPS coordinates, distance, and result.</p>
+        <button class="refresh-btn" id="btnRefresh">🔄 Refresh Logs</button>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>File ID</th>
+                    <th>GPS</th>
+                    <th>Distance</th>
+                    <th>Result</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody id="logBody">
+                <tr><td colspan="6" class="empty">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function loadLogs() {
+            fetch(`${API_URL}/api/logs`)
+            .then(r => r.json())
+            .then(data => {
+                const body = document.getElementById('logBody');
+                if (!data.logs || data.logs.length === 0) {
+                    body.innerHTML = '<tr><td colspan="6" class="empty">No access attempts yet.</td></tr>';
+                    return;
+                }
+                body.innerHTML = data.logs.map(log => {
+                    const t = new Date(log.timestamp);
+                    const time = t.toLocaleString();
+                    const cls = log.result === 'GRANTED' ? 'granted' : 'denied';
+                    const dist = log.distance_m !== null ? `${log.distance_m}m` : '—';
+                    const shortId = log.file_id.substring(0, 8) + '...';
+                    return `<tr>
+                        <td>${time}</td>
+                        <td class="file-id" title="${log.file_id}">${shortId}</td>
+                        <td>${log.lat}, ${log.lon}</td>
+                        <td>${dist}</td>
+                        <td class="${cls}">${log.result}</td>
+                        <td>${log.reason}</td>
+                    </tr>`;
+                }).join('');
+            }).catch(() => {
+                document.getElementById('logBody').innerHTML = '<tr><td colspan="6" class="empty">Failed to load logs.</td></tr>';
+            });
+        }
+
+        document.getElementById('btnRefresh').addEventListener('click', loadLogs);
+        loadLogs();
+    </script>
+</body>
+</html>

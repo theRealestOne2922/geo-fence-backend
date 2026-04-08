@@ -48,6 +48,11 @@
         .sim-toggle{display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.25;transition:opacity .2s;cursor:pointer;font-size:0.7rem;color:#5a5a4a;margin-top:4px}
         .sim-toggle:hover{opacity:0.6}
         .sim-toggle input{accent-color:#004643}
+        .file-info{background:#1a2a2c;border:1px solid #004643;border-radius:10px;padding:16px;font-size:0.82rem;color:#a0a090;display:none;line-height:1.7}
+        .file-info.show{display:block}
+        .file-info .fname{color:#00c896;font-weight:600}
+        .file-info .expired{color:#ff6b6b;font-weight:600}
+        .file-info .active{color:#00c896;font-weight:600}
         @media(max-width:768px){
             .page{grid-template-columns:1fr}
             .left{padding:32px 24px}
@@ -94,6 +99,8 @@
 
             <input type="text" id="fileIdInput" placeholder="Paste File ID here">
 
+            <div class="file-info" id="fileInfo"></div>
+
             <button class="btn btn-primary" id="btnDecrypt" disabled>Waiting for GPS...</button>
 
             <div class="status" id="status">
@@ -128,6 +135,38 @@
                 gpsBox.innerHTML = '<span class="err">GPS access denied. Please allow location in your browser settings.</span>';
             }, { enableHighAccuracy: true, timeout: 15000 });
         }
+
+        // Auto-check file info when user pastes or types a File ID
+        const fileIdInput = document.getElementById('fileIdInput');
+        const fileInfoDiv = document.getElementById('fileInfo');
+        let checkTimeout = null;
+        fileIdInput.addEventListener('input', () => {
+            clearTimeout(checkTimeout);
+            fileInfoDiv.classList.remove('show');
+            const fid = fileIdInput.value.trim();
+            if (fid.length >= 10) {
+                checkTimeout = setTimeout(() => {
+                    fetch(`${API_URL}/file-info`, {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json'},
+                        body: JSON.stringify({ file_id: fid })
+                    })
+                    .then(r => r.json())
+                    .then(info => {
+                        if (info.found) {
+                            const mins = Math.floor(info.remaining_seconds / 60);
+                            const secs = info.remaining_seconds % 60;
+                            const expLabel = info.expired
+                                ? '<span class="expired">⛔ EXPIRED</span>'
+                                : `<span class="active">⏱ ${mins}m ${secs}s remaining</span>`;
+                            const sizeKB = (info.file_size / 1024).toFixed(1);
+                            fileInfoDiv.innerHTML = `File: <span class="fname">${info.filename}</span> (${sizeKB} KB)<br>GeoHash: ${info.geohash}<br>Status: ${expLabel}`;
+                            fileInfoDiv.classList.add('show');
+                        }
+                    }).catch(() => {});
+                }, 400);
+            }
+        });
 
         btnDecrypt.addEventListener('click', () => {
             const fileId = document.getElementById('fileIdInput').value.trim();
@@ -168,7 +207,7 @@
                     statusDiv.classList.add('denied');
                     document.getElementById('statusTitle').textContent = '🚫 Access Denied';
                     document.getElementById('distanceText').textContent = `${data.distance} m`;
-                    document.getElementById('detailText').innerHTML = `${data.message}<br>GeoHash: ${data.geohash || 'N/A'}`;
+                    document.getElementById('detailText').innerHTML = `${data.message}<br>GeoHash: ${data.geohash || 'N/A'}${data.expired ? '<br><span style="color:#ff6b6b">File has expired.</span>' : ''}`;
                 }
             }).catch(() => {
                 btnDecrypt.disabled = false;

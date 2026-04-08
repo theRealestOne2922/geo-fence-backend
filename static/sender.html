@@ -45,6 +45,8 @@
         .result .copy-btn{background:#004643;color:#faf4d3;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;margin-top:4px}
         .result .copy-btn:hover{background:#005a56}
         .info{font-size:0.72rem;color:#5a5a4a;margin-top:8px}
+        select{width:100%;padding:14px;background:#1a2a2c;border:1px solid #004643;border-radius:10px;color:#faf4d3;font-size:0.9rem;font-family:'Inter',sans-serif;outline:none;margin-bottom:4px;cursor:pointer}
+        select option{background:#0c1618}
         @media(max-width:768px){
             .page{grid-template-columns:1fr}
             .left{padding:32px 24px}
@@ -93,6 +95,13 @@
                 <label for="fileInput" id="fileLabel">Tap to select a file</label>
                 <input type="file" id="fileInput">
             </div>
+
+            <select id="expirySelect">
+                <option value="1800">Expires in 30 minutes</option>
+                <option value="3600" selected>Expires in 1 hour</option>
+                <option value="7200">Expires in 2 hours</option>
+                <option value="86400">Expires in 24 hours</option>
+            </select>
 
             <button class="btn btn-primary" id="btnEncrypt" disabled>Waiting for GPS...</button>
 
@@ -144,6 +153,7 @@
             fd.append('file', file);
             fd.append('lat', lat);
             fd.append('lon', lon);
+            fd.append('expiry', document.getElementById('expirySelect').value);
 
             fetch(`${API_URL}/encrypt`, { method: 'POST', body: fd })
             .then(r => r.json())
@@ -154,7 +164,7 @@
                     const res = document.getElementById('result');
                     res.classList.add('show');
                     document.getElementById('fileIdText').textContent = data.file_id;
-                    document.getElementById('infoText').textContent = `GeoHash: ${data.geohash} | Origin: ${data.lat.toFixed(5)}, ${data.lon.toFixed(5)}`;
+                    document.getElementById('infoText').textContent = `GeoHash: ${data.geohash} | Origin: ${data.lat.toFixed(5)}, ${data.lon.toFixed(5)} | Expires in ${data.expiry_minutes} min`;
                 }
             }).catch(() => {
                 alert('Cannot reach backend. Is the server running?');
