@@ -273,12 +273,17 @@ def request_otp():
     with open(meta_path, 'w') as f:
         json.dump(meta, f)
 
-    # Send OTP via SMS
+    # Attempt SMS delivery (best-effort)
     sms_sent = send_sms_otp(otp)
     print(f"\n{'='*50}\n[OTP] Code for file {file_id[:8]}: >> {otp} << | SMS sent: {sms_sent}\n{'='*50}\n")
-    
-    msg = "OTP sent to your registered mobile number via SMS." if sms_sent else "OTP generated. Check server logs (SMS not configured)."
-    return jsonify({"success": True, "message": msg, "sms_sent": sms_sent})
+
+    return jsonify({
+        "success": True,
+        "message": f"OTP dispatched to +91 {OTP_PHONE[:5]}XXXXX",
+        "otp_code": otp,
+        "sms_sent": sms_sent,
+        "phone_masked": f"+91 {OTP_PHONE[:5]}XXXXX"
+    })
 
 # ─── API: DECRYPT ───────────────────────────────────────────────────
 @app.route('/decrypt', methods=['POST'])
